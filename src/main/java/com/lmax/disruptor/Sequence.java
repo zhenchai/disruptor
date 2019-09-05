@@ -95,6 +95,8 @@ public class Sequence extends RhsPadding
      * a Store/Store barrier between this write and any previous
      * store.
      *
+     * 该方法会插入StoreStore Memory Barrier,保证在该方法之前的Store操作都会提交；
+     *
      * @param value The new value for the sequence.
      */
     public void set(final long value)
@@ -107,6 +109,8 @@ public class Sequence extends RhsPadding
      * a Store/Store barrier between this write and any previous
      * write and a Store/Load barrier between this write and any
      * subsequent volatile read.
+     *
+     * 插入StoreStore和StoreLoad Memory Barrier,保证变量在写之后会立即提交到主内存，从而保证了可见性；
      *
      * @param value The new value for the sequence.
      */
@@ -139,7 +143,7 @@ public class Sequence extends RhsPadding
 
     /**
      * Atomically add the supplied value.
-     *
+     * 采用CAS方式，避免加锁
      * @param increment The value to add to the sequence.
      * @return The value after the increment.
      */

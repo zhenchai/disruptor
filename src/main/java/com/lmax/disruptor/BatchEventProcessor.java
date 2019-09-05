@@ -19,6 +19,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 
 /**
+ * 事件处理器的执行单元
+ *
  * Convenience class for handling the batching semantics of consuming entries from a {@link RingBuffer}
  * and delegating the available events to an {@link EventHandler}.
  * <p>
@@ -113,10 +115,13 @@ public final class BatchEventProcessor<T>
     @Override
     public void run()
     {
+        // 确保一次只有一个线程执行此方法，这样访问自身的序号就不要加锁
         if (running.compareAndSet(IDLE, RUNNING))
         {
+            // 清除前置序号关卡的通知状态
             sequenceBarrier.clearAlert();
 
+            // 声明周期通知，开始前回调
             notifyStart();
             try
             {
@@ -150,18 +155,24 @@ public final class BatchEventProcessor<T>
     private void processEvents()
     {
         T event = null;
+        // sequence指向上一个已处理的事件，默认是-1.
         long nextSequence = sequence.get() + 1L;
 
         while (true)
         {
             try
             {
+                // 从它的前置序号关卡获取下一个可处理的事件序号。
+                // 如果这个事件处理器不依赖于其他的事件处理器，则前置关卡就是生产者序号；
+                // 如果这个事件处理器依赖于1个或多个事件处理器，那么这个前置关卡就是这些前置事件处理器中最慢的一个。
+                // 通过这样，可以确保事件处理器不会超前处理地事件。
                 final long availableSequence = sequenceBarrier.waitFor(nextSequence);
                 if (batchStartAware != null && availableSequence >= nextSequence)
                 {
                     batchStartAware.onBatchStart(availableSequence - nextSequence + 1);
                 }
 
+                // 处理一批事件
                 while (nextSequence <= availableSequence)
                 {
                     event = dataProvider.get(nextSequence);
@@ -169,14 +180,18 @@ public final class BatchEventProcessor<T>
                     nextSequence++;
                 }
 
+                // 设置它自己最后处理的事件序号，这样依赖于它的处理器可以它处理刚处理过的事件。
                 sequence.set(availableSequence);
             }
             catch (final TimeoutException e)
             {
+                // 获取事件序号超时处理
                 notifyTimeout(sequence.get());
             }
             catch (final AlertException ex)
             {
+                // 处理通知事件；
+                // 检测是否要停止，如果非则继续处理事件
                 if (running.get() != RUNNING)
                 {
                     break;
@@ -184,6 +199,7 @@ public final class BatchEventProcessor<T>
             }
             catch (final Throwable ex)
             {
+                // 其他异常，用事件处理器处理；然后继续处理下一个事件
                 exceptionHandler.handleEventException(ex, nextSequence, event);
                 sequence.set(nextSequence);
                 nextSequence++;

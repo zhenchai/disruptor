@@ -17,6 +17,7 @@ package com.lmax.disruptor;
 
 
 /**
+ * 协作式栅栏，用于跟踪生产者游标和依赖的事件处理器的序号的数据结构
  * Coordination barrier for tracking the cursor for publishers and sequence of
  * dependent {@link EventProcessor}s for processing a data structure
  */

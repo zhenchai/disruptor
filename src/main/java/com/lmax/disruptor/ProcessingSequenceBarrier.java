@@ -37,22 +37,29 @@ final class ProcessingSequenceBarrier implements SequenceBarrier
         this.sequencer = sequencer;
         this.waitStrategy = waitStrategy;
         this.cursorSequence = cursorSequence;
+
+        // 如果事件处理器不依赖于任何前置处理器，那么dependentSequence也指向生产者的序号。
         if (0 == dependentSequences.length)
         {
             dependentSequence = cursorSequence;
         }
         else
         {
+            // 如果有多个前置处理器，则对其进行封装，实现了组合模式。
             dependentSequence = new FixedSequenceGroup(dependentSequences);
         }
     }
 
+    /**
+     * 该方法不保证总是返回未处理的序号；如果有更多的可处理序号时，返回的序号也可能是超过指定序号的。
+     */
     @Override
     public long waitFor(final long sequence)
         throws AlertException, InterruptedException, TimeoutException
     {
         checkAlert();
 
+        // 通过等待策略来获取可处理事件序号，
         long availableSequence = waitStrategy.waitFor(sequence, cursorSequence, dependentSequence, this);
 
         if (availableSequence < sequence)
@@ -60,6 +67,7 @@ final class ProcessingSequenceBarrier implements SequenceBarrier
             return availableSequence;
         }
 
+        // 再通过生产者序号控制器返回最大的可处理序号
         return sequencer.getHighestPublishedSequence(sequence, availableSequence);
     }
 

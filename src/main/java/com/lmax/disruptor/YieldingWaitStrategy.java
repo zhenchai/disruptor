@@ -22,6 +22,8 @@ package com.lmax.disruptor;
  * <p>
  * This strategy will use 100% CPU, but will more readily give up the CPU than a busy spin strategy if other threads
  * require CPU resource.
+ *
+ * 通过调用Thread.yield方法来让出CPU，达到等待的目的，等待时长没保证，取决于线程的调度系统。
  */
 public final class YieldingWaitStrategy implements WaitStrategy
 {

@@ -53,11 +53,17 @@ abstract class RingBufferFields<E> extends RingBufferPad
         REF_ARRAY_BASE = UNSAFE.arrayBaseOffset(Object[].class) + 128;
     }
 
+    /**
+     * 属性的初始化声明
+     */
     private final long indexMask;
     private final Object[] entries;
     protected final int bufferSize;
     protected final Sequencer sequencer;
 
+    /**
+     * 属性的初始化代码
+     */
     RingBufferFields(
         EventFactory<E> eventFactory,
         Sequencer sequencer)
@@ -79,6 +85,10 @@ abstract class RingBufferFields<E> extends RingBufferPad
         fill(eventFactory);
     }
 
+    /**
+     * 填充ringBuffer
+     * @param eventFactory
+     */
     private void fill(EventFactory<E> eventFactory)
     {
         for (int i = 0; i < bufferSize; i++)
@@ -90,6 +100,7 @@ abstract class RingBufferFields<E> extends RingBufferPad
     @SuppressWarnings("unchecked")
     protected final E elementAt(long sequence)
     {
+
         return (E) UNSAFE.getObject(entries, REF_ARRAY_BASE + ((sequence & indexMask) << REF_ELEMENT_SHIFT));
     }
 }
@@ -457,12 +468,19 @@ public final class RingBuffer<E> extends RingBufferFields<E> implements Cursored
 
 
     /**
+     * 发布事件有三步
+     * 1、获取新事件的序号
+     * 2、覆盖旧事件
+     * 3、通知等待
+     *
      * @see com.lmax.disruptor.EventSink#publishEvent(com.lmax.disruptor.EventTranslator)
      */
     @Override
     public void publishEvent(EventTranslator<E> translator)
     {
+        // 通过生产者序号控制器获取可用序号
         final long sequence = sequencer.next();
+        // 转换事件到队列缓存并发布事件
         translateAndPublish(translator, sequence);
     }
 
@@ -959,10 +977,14 @@ public final class RingBuffer<E> extends RingBufferFields<E> implements Cursored
     {
         try
         {
+            // 发布事件前要先获取对应位置上的旧事件，再用translator把新事件的属性转换到旧事件的属性，从而达到发布的目的。
+            // 这就是说，Disruptor对于已消费的事件是不删除的，有新事件时只是用新事件的属性去替换旧事件的属性。
+            // 这带来的一个问题就是内存占用
             translator.translateTo(get(sequence), sequence);
         }
         finally
         {
+            // 原子性地更新生产者的序号，并通知在等待的消费者关卡。
             sequencer.publish(sequence);
         }
     }

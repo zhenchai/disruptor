@@ -26,6 +26,7 @@ import java.util.Arrays;
 /**
  * A group of {@link EventProcessor}s used as part of the {@link Disruptor}.
  *
+ * 一组eventProcessor
  * @param <T> the type of entry used by the event processors.
  */
 public class EventHandlerGroup<T>

@@ -22,6 +22,8 @@ import java.util.*;
 /**
  * Provides a repository mechanism to associate {@link EventHandler}s with {@link EventProcessor}s
  *
+ * eventHandler与eventProcessor关联
+ *
  * @param <T> the type of the {@link EventHandler}
  */
 class ConsumerRepository<T> implements Iterable<ConsumerInfo>

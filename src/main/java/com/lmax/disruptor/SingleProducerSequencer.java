@@ -132,8 +132,11 @@ public final class SingleProducerSequencer extends SingleProducerSequencerFields
             cursor.setVolatile(nextValue);  // StoreLoad fence
 
             long minSequence;
+
+            // 判断队列是否已满
             while (wrapPoint > (minSequence = Util.getMinimumSequence(gatingSequences, nextValue)))
             {
+                // 队列已满，暂停线程执行
                 LockSupport.parkNanos(1L); // TODO: Use waitStrategy to spin?
             }
 

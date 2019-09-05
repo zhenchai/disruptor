@@ -59,7 +59,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class Disruptor<T>
 {
     private final RingBuffer<T> ringBuffer;
+    /** 用于执行事件处理器的线程池 */
     private final Executor executor;
+    /** 事件处理器仓库，就是事件处理器的集合 */
     private final ConsumerRepository<T> consumerRepository = new ConsumerRepository<>();
     private final AtomicBoolean started = new AtomicBoolean(false);
     private ExceptionHandler<? super T> exceptionHandler = new ExceptionHandlerWrapper<>();
@@ -534,33 +536,44 @@ public class Disruptor<T>
         return consumerRepository.hasBacklog(cursor, false);
     }
 
+    /**
+     * 设置EventHandler事件处理器
+     * barrierSequences是eventHandlers的前置事件处理关卡，是用来保证事件处理的时序性的关键；
+     */
     EventHandlerGroup<T> createEventProcessors(
         final Sequence[] barrierSequences,
         final EventHandler<? super T>[] eventHandlers)
     {
         checkNotStarted();
 
+        // 存放游标的数组
         final Sequence[] processorSequences = new Sequence[eventHandlers.length];
+        // 获取前置的序号关卡
         final SequenceBarrier barrier = ringBuffer.newBarrier(barrierSequences);
 
         for (int i = 0, eventHandlersLength = eventHandlers.length; i < eventHandlersLength; i++)
         {
             final EventHandler<? super T> eventHandler = eventHandlers[i];
 
+            // 封装为批量事件处理器BatchEventProcessor，其实现了Runnable接口，
+            // 所以可以放到executor去执行处理逻辑；处理器还会自动建立一个序号Sequence。
             final BatchEventProcessor<T> batchEventProcessor =
                 new BatchEventProcessor<>(ringBuffer, barrier, eventHandler);
 
             if (exceptionHandler != null)
             {
+                // 如果有则设置异常处理器
                 batchEventProcessor.setExceptionHandler(exceptionHandler);
             }
 
+            // 添加到消费者仓库，会先封装为EventProcessorInfo对象（表示事件处理的一个阶段），
             consumerRepository.add(batchEventProcessor, eventHandler, barrier);
             processorSequences[i] = batchEventProcessor.getSequence();
         }
 
         updateGatingSequencesForNextInChain(barrierSequences, processorSequences);
 
+        // EventHandlerGroup是一组EventProcessor，作为disruptor的一部分，提供DSL形式的方法，作为方法链的起点，用于设置事件处理器。
         return new EventHandlerGroup<>(this, consumerRepository, processorSequences);
     }
 
